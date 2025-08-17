@@ -1,42 +1,3 @@
-<?php
-require_once 'includes/config.php';
-
-$errors = [];
-$success = '';
-
-if(isset($_POST['register'])){
-    $Name = trim($_POST['name']);
-    $Email = trim($_POST['email']);
-    $Password = $_POST['password'];
-    if(empty($Name) || empty($Email) || empty($Password)){
-        $errors[] = "Name, Email, and Password are required";
-    }
-    if(!filter_var($Email, FILTER_VALIDATE_EMAIL)){
-        $errors[] = "Invalid email format";
-    }
-
-    if(empty($errors)){
-        $stmt = $conn->prepare("SELECT Id FROM users WHERE Email=?");
-        $stmt->bind_param("s", $Email);
-        $stmt->execute();
-        $stmt->store_result();
-
-        if($stmt->num_rows > 0){
-            $errors[] = "Email already registered!";
-        } else {
-            $PasswordHash = password_hash($Password, PASSWORD_DEFAULT);
-            $CreatedAt = date("Y-m-d H:i:s");
-            $stmt = $conn->prepare("INSERT INTO users (Name, Email,PasswordHash, CreatedAt) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("ssss", $Name, $Email, $PasswordHash, $CreatedAt);
-            if($stmt->execute()){
-                header("Location:login.php");
-            } else {
-                $errors[] = "Database Error: " . $stmt->error;
-            }
-        }
-    }
-}
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -290,10 +251,6 @@ if(isset($_POST['register'])){
         .btn-primary:active {
             transform: translateY(0);
         }
-        .btn-primary a{
-            color:white;
-            text-decoration:none;
-        }
 
         .divider {
             display: flex;
@@ -380,6 +337,10 @@ if(isset($_POST['register'])){
             color: var(--orange);
         }
 
+        .hidden {
+            display: none;
+        }
+
         /* Mobile Responsiveness */
         @media (max-width: 768px) {
             .auth-container {
@@ -464,14 +425,15 @@ if(isset($_POST['register'])){
 
         @keyframes spin {
             0% { transform: rotate(0deg); }
-          
+            100% { transform: rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <div class="breadcrumb">
-        <a href="home.php">← Back to Chapter & Verse</a>
+        <a href="#" onclick="goHome()">← Back to Chapter & Verse</a>
     </div>
+
     <div class="auth-container">
         <div class="auth-visual">
             <div class="visual-content">
@@ -482,22 +444,65 @@ if(isset($_POST['register'])){
                 </div>
             </div>
         </div>
-    <?php
-    if(!empty($errors)){
-        echo '<ul style="color:red;">';
-        foreach($errors as $error){
-            echo "<li>$error</li>";
-        }
-        echo '</ul>';
-    }
 
-    if($success){
-        echo '<p style="color:green;">'.$success.'</p>';
-    }
-    ?>
-    <div class="auth-form">
+        <div class="auth-form">
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form-content">
+                <div class="form-header">
+                    <h2>Welcome Back</h2>
+                    <p>Continue your literary journey</p>
+                </div>
+
+                <div class="social-login">
+                    <a href="#" class="social-btn" onclick="socialLogin('google')">
+                        <i class="fab fa-google"></i>
+                        Google
+                    </a>
+                    <a href="#" class="social-btn" onclick="socialLogin('apple')">
+                        <i class="fab fa-apple"></i>
+                        Apple
+                    </a>
+                </div>
+
+                <div class="divider">
+                    <span>or continue with email</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="loginEmail">Email Address</label>
+                    <input type="email" id="loginEmail" class="form-control" placeholder="your@email.com" required>
+                    <div class="error-message" id="loginEmailError">Please enter a valid email address</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" class="form-control" placeholder="Enter your password" required>
+                    <div class="error-message" id="loginPasswordError">Password is required</div>
+                </div>
+
+                <div class="form-options">
+                    <div class="checkbox-wrapper">
+                        <input type="checkbox" id="rememberMe">
+                        <label for="rememberMe">Remember me</label>
+                    </div>
+                    <a href="#" class="forgot-link" onclick="showForgotPassword()">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="btn-primary">Sign In</button>
+
+                <div class="form-footer">
+                    <div class="form-toggle">
+                        New to Chapter & Verse? <a href="#" onclick="toggleForm('register')">Create an account</a>
+                    </div>
+                    <div class="privacy-links">
+                        <a href="#" onclick="showPrivacy()">Privacy Policy</a>
+                        <a href="#" onclick="showTerms()">Terms of Service</a>
+                    </div>
+                </div>
+            </form>
+
             <!-- Register Form -->
-            <form id="registerForm" class="auth-form-content" method="POST" action="register.php">
+            <form id="registerForm" class="auth-form-content hidden">
                 <div class="form-header">
                     <h2>Join Our Community</h2>
                     <p>Discover your next favorite book</p>
@@ -520,19 +525,19 @@ if(isset($_POST['register'])){
 
                 <div class="form-group">
                     <label for="registerName">Full Name</label>
-                    <input name="name" type="text" id="registerName" class="form-control" placeholder="Your full name" required>
+                    <input type="text" id="registerName" class="form-control" placeholder="Your full name" required>
                     <div class="error-message" id="registerNameError">Please enter your full name</div>
                 </div>
 
                 <div class="form-group">
                     <label for="registerEmail">Email Address</label>
-                    <input name="email" type="email" id="registerEmail" class="form-control" placeholder="your@email.com" required>
+                    <input type="email" id="registerEmail" class="form-control" placeholder="your@email.com" required>
                     <div class="error-message" id="registerEmailError">Please enter a valid email address</div>
                 </div>
 
                 <div class="form-group">
                     <label for="registerPassword">Password</label>
-                    <input  name="password" type="password" id="registerPassword" class="form-control" placeholder="Create a strong password" required>
+                    <input type="password" id="registerPassword" class="form-control" placeholder="Create a strong password" required>
                     <div class="error-message" id="registerPasswordError">Password must be at least 8 characters</div>
                 </div>
 
@@ -543,11 +548,11 @@ if(isset($_POST['register'])){
                     </div>
                 </div>
 
-                <button name="register" type="submit" class="btn-primary"><a href="home.php">Create Account</a></button>
+                <button type="submit" class="btn-primary"><a href="register.php">Create Account</a></button>
 
                 <div class="form-footer">
                     <div class="form-toggle">
-                        Already have an account? <a href="login.php">Sign in</a>
+                        Already have an account? <a href="#" onclick="toggleForm('login')">Sign in</a>
                     </div>
                     <div class="privacy-links">
                         <a href="#" onclick="showPrivacy()">Privacy Policy</a>
@@ -557,6 +562,210 @@ if(isset($_POST['register'])){
             </form>
         </div>
     </div>
-    </div>
+
+    <script>
+        // Form validation
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
+        }
+
+        function validatePassword(password) {
+            return password.length >= 8;
+        }
+
+        function showError(inputId, errorId, message) {
+            const input = document.getElementById(inputId);
+            const error = document.getElementById(errorId);
+            input.classList.add('error');
+            error.textContent = message;
+            error.classList.add('show');
+        }
+
+        function hideError(inputId, errorId) {
+            const input = document.getElementById(inputId);
+            const error = document.getElementById(errorId);
+            input.classList.remove('error');
+            error.classList.remove('show');
+        }
+
+        function showSuccess(inputId) {
+            const input = document.getElementById(inputId);
+            input.classList.add('success');
+        }
+
+
+        // Login form handling
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const submitBtn = this.querySelector('.btn-primary');
+            
+            let isValid = true;
+            
+            // Reset previous errors
+            hideError('loginEmail', 'loginEmailError');
+            hideError('loginPassword', 'loginPasswordError');
+            
+            // Validate email
+            if (!email) {
+                showError('loginEmail', 'loginEmailError', 'Email is required');
+                isValid = false;
+            } else if (!validateEmail(email)) {
+                showError('loginEmail', 'loginEmailError', 'Please enter a valid email address');
+                isValid = false;
+            } else {
+                showSuccess('loginEmail');
+            }
+            
+            // Validate password
+            if (!password) {
+                showError('loginPassword', 'loginPasswordError', 'Password is required');
+                isValid = false;
+            } else {
+                showSuccess('loginPassword');
+            }
+            
+            if (isValid) {
+                // Show loading state
+                submitBtn.classList.add('loading');
+                submitBtn.textContent = '';
+                
+                // Simulate API call
+                setTimeout(() => {
+                    alert('Login successful! Welcome back to Chapter & Verse.');
+                    submitBtn.classList.remove('loading');
+                    submitBtn.textContent = 'Sign In';
+                }, 2000);
+            }
+        });
+
+        // Register form handling
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            
+            
+            const name = document.getElementById('registerName').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const agreeTerms = document.getElementById('agreeTerms').checked;
+            const submitBtn = this.querySelector('.btn-primary');
+            
+            let isValid = true;
+            
+            // Reset previous errors
+            hideError('registerName', 'registerNameError');
+            hideError('registerEmail', 'registerEmailError');
+            hideError('registerPassword', 'registerPasswordError');
+            
+            // Validate name
+            if (!name.trim()) {
+                showError('registerName', 'registerNameError', 'Full name is required');
+                isValid = false;
+            } else {
+                showSuccess('registerName');
+            }
+            
+            // Validate email
+            if (!email) {
+                showError('registerEmail', 'registerEmailError', 'Email is required');
+                isValid = false;
+            } else if (!validateEmail(email)) {
+                showError('registerEmail', 'registerEmailError', 'Please enter a valid email address');
+                isValid = false;
+            } else {
+                showSuccess('registerEmail');
+            }
+            
+            // Validate password
+            if (!password) {
+                showError('registerPassword', 'registerPasswordError', 'Password is required');
+                isValid = false;
+            } else if (!validatePassword(password)) {
+                showError('registerPassword', 'registerPasswordError', 'Password must be at least 8 characters long');
+                isValid = false;
+            } else {
+                showSuccess('registerPassword');
+            }
+            
+            // Check terms agreement
+            if (!agreeTerms) {
+                alert('Please agree to the Terms of Service and Privacy Policy to continue.');
+                isValid = false;
+            }
+            
+            if (isValid) {
+                // Show loading state
+                submitBtn.classList.add('loading');
+                submitBtn.textContent = '';
+                
+                // Simulate API call
+                setTimeout(() => {
+                    alert('Account created successfully! Welcome to Chapter & Verse.');
+                    submitBtn.classList.remove('loading');
+                    submitBtn.textContent = 'Create Account';
+                }, 2000);
+            }
+        });
+
+        // Social login
+        function socialLogin(provider) {
+            alert(`Social login with ${provider} would redirect to ${provider} OAuth flow.`);
+        }
+
+        // Navigation functions
+        function goHome() {
+            alert('Redirecting to Chapter & Verse homepage...');
+        }
+
+        function showForgotPassword() {
+            const email = prompt('Please enter your email address to receive password reset instructions:');
+            if (email && validateEmail(email)) {
+                alert(`Password reset instructions have been sent to ${email}`);
+            } else if (email) {
+                alert('Please enter a valid email address.');
+            }
+        }
+
+        function showPrivacy() {
+            alert('Privacy Policy would open in a new window or modal.');
+        }
+
+        function showTerms() {
+            alert('Terms of Service would open in a new window or modal.');
+        }
+
+        // Real-time validation
+        document.getElementById('loginEmail').addEventListener('blur', function() {
+            const email = this.value;
+            if (email && !validateEmail(email)) {
+                showError('loginEmail', 'loginEmailError', 'Please enter a valid email address');
+            } else if (email) {
+                hideError('loginEmail', 'loginEmailError');
+                showSuccess('loginEmail');
+            }
+        });
+
+        document.getElementById('registerEmail').addEventListener('blur', function() {
+            const email = this.value;
+            if (email && !validateEmail(email)) {
+                showError('registerEmail', 'registerEmailError', 'Please enter a valid email address');
+            } else if (email) {
+                hideError('registerEmail', 'registerEmailError');
+                showSuccess('registerEmail');
+            }
+        });
+
+        document.getElementById('registerPassword').addEventListener('input', function() {
+            const password = this.value;
+            if (password && !validatePassword(password)) {
+                showError('registerPassword', 'registerPasswordError', 'Password must be at least 8 characters long');
+            } else if (password) {
+                hideError('registerPassword', 'registerPasswordError');
+                showSuccess('registerPassword');
+            }
+        });
+    </script>
 </body>
 </html>

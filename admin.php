@@ -1,0 +1,318 @@
+<?php
+session_start();
+require_once 'includes/config.php';
+
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
+}
+
+$user_id = $_SESSION['user_id'];
+$query = $conn->prepare("SELECT Role FROM users WHERE Id = ?");
+$query->bind_param("i", $user_id);
+$query->execute();
+$result = $query->get_result();
+$user = $result->fetch_assoc();
+
+if (!$user || $user['Role'] !== 'admin') {
+    header("Location: index.php");
+    exit();
+}
+
+
+$users = $conn->query("SELECT * FROM users ORDER BY CreatedAt DESC");
+$books = $conn->query("SELECT b.*, u.Name AS OwnerName FROM books b JOIN users u ON b.OwnerId = u.Id ORDER BY b.CreatedAt DESC");
+$requests = $conn->query("
+    SELECT r.*, b.Title AS BookTitle, u1.Name AS OwnerName, u2.Name AS RequesterName
+    FROM exchangerequests r
+    JOIN books b ON r.BookId = b.Id
+    JOIN users u1 ON b.OwnerId = u1.Id
+    JOIN users u2 ON r.RequesterId = u2.Id
+    ORDER BY r.CreatedAt DESC
+");
+?>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+    --cream: #F8F6F3;
+    --charcoal: #2C2C2C;
+    --orange: #E8A87C;
+    --green: #4CAF50;
+    --red: #E74C3C;
+    --blue: #3498db;
+    --gray: #aaa;
+}
+* {
+    box-sizing: border-box;
+}
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--cream);
+    color: var(--charcoal);
+    margin: 0;
+    padding: 20px;
+}
+h1, h2 {
+    font-family: 'Playfair Display', serif;
+    color: var(--charcoal);
+}
+h1 {
+    margin-bottom: 20px;
+}
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+.card {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    text-align: center;
+    transition: transform 0.2s ease;
+}
+.card:hover {
+    transform: translateY(-3px);
+}
+.card i {
+    font-size: 28px;
+    margin-bottom: 8px;
+    display: block;
+}
+.card h3 {
+    margin: 8px 0;
+    font-size: 18px;
+}
+.card .number {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--orange);
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 30px;
+    overflow-x: auto;
+    display: block;
+}
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+    white-space: nowrap;
+}
+th {
+    background: linear-gradient(135deg, var(--charcoal), #444);
+    color: #fff;
+}
+tr:hover {
+    background: #fdfaf7;
+}
+td:first-child {
+    font-weight: bold;
+    color: var(--orange);
+}
+button {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    margin: 2px;
+    color: #fff;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+button[value="delete"],
+button[name="action"][value="delete_book"],
+button[name="action"][value="delete_request"] {
+    background: var(--red);
+}
+button[value="approve_request"] {
+    background: var(--green);
+}
+button[value="reject_request"] {
+    background: var(--orange);
+    color: #000;
+}
+button[value="promote"] {
+    background: var(--blue);
+}
+button[value="demote"] {
+    background: var(--gray);
+}
+.badge {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    color: #fff;
+}
+.badge.admin { background: var(--blue); }
+.badge.user { background: var(--gray); }
+.badge.pending { background: var(--orange); color:#000; }
+.badge.approved { background: var(--green); }
+.badge.rejected { background: var(--red); }
+.empty-state {
+    text-align: center;
+    padding: 20px;
+    color: var(--gray);
+    font-style: italic;
+}
+.back-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 14px 20px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--orange), var(--charcoal));
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: transform 0.2s ease;
+    z-index: 1000;
+    font-size: 20px;
+}
+.back-btn:hover {
+    transform: scale(1.1);
+}
+</style>
+<script>
+// simple confirm for delete
+function confirmAction(e, msg) {
+    if (!confirm(msg)) {
+        e.preventDefault();
+    }
+}
+// animated numbers
+document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll(".number").forEach(num => {
+        let target = +num.dataset.target;
+        let count = 0;
+        let step = target / 50;
+        let interval = setInterval(() => {
+            count += step;
+            if (count >= target) {
+                num.textContent = target;
+                clearInterval(interval);
+            } else {
+                num.textContent = Math.floor(count);
+            }
+        }, 30);
+    });
+});
+</script>
+</head>
+<body>
+
+<h1>Admin Panel</h1>
+
+<!-- Dashboard Stats -->
+<div class="dashboard">
+    <div class="card">
+        <i>👤</i>
+        <h3>Users</h3>
+        <div class="number" data-target="0">0</div>
+    </div>
+    <div class="card">
+        <i>📚</i>
+        <h3>Books</h3>
+        <div class="number" data-target="0">0</div>
+    </div>
+    <div class="card">
+        <i>🔄</i>
+        <h3>Requests</h3>
+        <div class="number" data-target="0">0</div>
+    </div>
+</div>
+
+<h2>Users</h2>
+<table>
+<tr>
+    <th>ID</th><th>Name</th><th>Email</th><th>Role</th><th>Created</th><th>Actions</th>
+</tr>
+<?php while($user = $users->fetch_assoc()): ?>
+<tr>
+    <td><?= $user['Id'] ?></td>
+    <td><?= htmlspecialchars($user['Name']) ?></td>
+    <td><?= htmlspecialchars($user['Email']) ?></td>
+    <td><span class="badge <?= $user['Role']=='admin'?'admin':'user' ?>"><?= $user['Role'] ?></span></td>
+    <td><?= date("M d, Y", strtotime($user['CreatedAt'])) ?></td>
+    <td>
+        <form style="display:inline;" method="POST" action="admin_action.php" onsubmit="confirmAction(event,'Are you sure?')">
+            <input type="hidden" name="user_id" value="<?= $user['Id'] ?>">
+            <button name="action" value="delete">Delete</button>
+            <button name="action" value="<?= $user['Role']=='admin'?'demote':'promote' ?>">
+                <?= $user['Role']=='admin'?'Demote':'Promote' ?>
+            </button>
+        </form>
+    </td>
+</tr>
+<?php endwhile; ?>
+</table>
+
+<h2>Books</h2>
+<table>
+<tr>
+    <th>ID</th><th>Title</th><th>Author</th><th>ISBN</th><th>Owner</th><th>Created</th><th>Actions</th>
+</tr>
+<?php while($book = $books->fetch_assoc()): ?>
+<tr>
+    <td><?= $book['Id'] ?></td>
+    <td><?= htmlspecialchars($book['Title']) ?></td>
+    <td><?= htmlspecialchars($book['Author']) ?></td>
+    <td><?= htmlspecialchars($book['ISBN']) ?></td>
+    <td><?= htmlspecialchars($book['OwnerName']) ?></td>
+    <td><?= date("M d, Y", strtotime($book['CreatedAt'])) ?></td>
+    <td>
+        <form style="display:inline;" method="POST" action="admin_action.php" onsubmit="confirmAction(event,'Delete this book?')">
+            <input type="hidden" name="book_id" value="<?= $book['Id'] ?>">
+            <button name="action" value="delete_book">Delete</button>
+        </form>
+    </td>
+</tr>
+<?php endwhile; ?>
+</table>
+
+<h2>Exchange Requests</h2>
+<table>
+<tr>
+    <th>ID</th><th>Book</th><th>Owner</th><th>Requester</th><th>Status</th><th>Created</th><th>Actions</th>
+</tr>
+<?php while($req = $requests->fetch_assoc()): ?>
+<tr>
+    <td><?= $req['Id'] ?></td>
+    <td><?= htmlspecialchars($req['BookTitle']) ?></td>
+    <td><?= htmlspecialchars($req['OwnerName']) ?></td>
+    <td><?= htmlspecialchars($req['RequesterName']) ?></td>
+    <td><span class="badge <?= strtolower($req['Status']) ?>"><?= $req['Status'] ?></span></td>
+    <td><?= date("M d, Y", strtotime($req['CreatedAt'])) ?></td>
+    <td>
+        <form style="display:inline;" method="POST" action="admin_action.php" onsubmit="confirmAction(event,'Are you sure?')">
+            <input type="hidden" name="request_id" value="<?= $req['Id'] ?>">
+            <button name="action" value="approve_request">Approve</button>
+            <button name="action" value="reject_request">Reject</button>
+            <button name="action" value="delete_request">Delete</button>
+        </form>
+    </td>
+</tr>
+<?php endwhile; ?>
+</table>
+
+<!-- Back to Website -->
+<button type="button" class="back-btn" onclick="window.location.href='home.php'">🏠</button>
+
+</body>
+</html>
