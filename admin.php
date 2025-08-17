@@ -23,15 +23,31 @@ if (!$user || $user['Role'] !== 'admin') {
 $users = $conn->query("SELECT * FROM users ORDER BY CreatedAt DESC");
 $books = $conn->query("SELECT b.*, u.Name AS OwnerName FROM books b JOIN users u ON b.OwnerId = u.Id ORDER BY b.CreatedAt DESC");
 $requests = $conn->query("
-    SELECT r.*, b.Title AS BookTitle, u1.Name AS OwnerName, u2.Name AS RequesterName
-    FROM exchangerequests r
-    JOIN books b ON r.BookId = b.Id
-    JOIN users u1 ON b.OwnerId = u1.Id
-    JOIN users u2 ON r.RequesterId = u2.Id
-    ORDER BY r.CreatedAt DESC
-");
-?>
+    SELECT r.*, 
+       b.Title AS BookTitle, 
+       u1.Name AS OwnerName, 
+       u2.Name AS RequesterName
+FROM exchangerequests r
+LEFT JOIN books b ON r.BookId = b.Id
+LEFT JOIN users u1 ON b.OwnerId = u1.Id
+LEFT JOIN users u2 ON r.RequesterId = u2.Id
+ORDER BY r.CreatedAt DESC
 
+");
+
+
+
+
+$userCountResult = $conn->query("SELECT COUNT(*) AS total FROM users");
+$userCount = $userCountResult->fetch_assoc()['total'];
+
+
+$bookCountResult = $conn->query("SELECT COUNT(*) AS total FROM books");
+$bookCount = $bookCountResult->fetch_assoc()['total'];
+
+$requestCountResult = $conn->query("SELECT COUNT(*) AS total FROM exchangerequests");
+$requestCount = $requestCountResult->fetch_assoc()['total'];
+?>
 
 <!DOCTYPE html>
 <html lang="en">
@@ -224,19 +240,20 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="card">
         <i>👤</i>
         <h3>Users</h3>
-        <div class="number" data-target="0">0</div>
+        <div class="number" data-target="<?= $userCount ?>"><?= $userCount ?></div>
     </div>
     <div class="card">
         <i>📚</i>
         <h3>Books</h3>
-        <div class="number" data-target="0">0</div>
+        <div class="number" data-target="<?= $bookCount ?>"><?= $bookCount ?></div>
     </div>
     <div class="card">
         <i>🔄</i>
         <h3>Requests</h3>
-        <div class="number" data-target="0">0</div>
+        <div class="number" data-target="<?= $requestCount ?>"><?= $requestCount ?></div>
     </div>
 </div>
+
 
 <h2>Users</h2>
 <table>
@@ -311,7 +328,7 @@ document.addEventListener("DOMContentLoaded", () => {
 <?php endwhile; ?>
 </table>
 
-<!-- Back to Website -->
+
 <button type="button" class="back-btn" onclick="window.location.href='home.php'">🏠</button>
 
 </body>

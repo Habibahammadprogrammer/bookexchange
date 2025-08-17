@@ -2,9 +2,8 @@
 session_start();
 require_once 'includes/config.php';
 
-$errors = [];
 if (!isset($_SESSION['user_id'])) {
-    header("Location:login.php");
+    header("Location: login.php");
     exit;
 }
 
@@ -12,36 +11,46 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     die("Invalid Book ID.");
 }
 
-$book_id = $_GET["id"];
-$sql = "SELECT * FROM books WHERE Id=? LIMIT 1";
+$book_id = intval($_GET['id']);
+$user_id = $_SESSION['user_id'];
+
+// Fetch book
+$sql = "SELECT * FROM books WHERE Id = ? AND OwnerId = ?";
 $stmt = $conn->prepare($sql);
-$stmt->bind_param("i", $book_id);
+$stmt->bind_param("ii", $book_id, $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
-if ($result->num_rows == 0) {
-    die("Book not found.");
+
+if ($result->num_rows === 0) {
+    die("Book not found or you do not have permission to edit it.");
 }
 $book = $result->fetch_assoc();
 
-// Handle POST submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $title = $_POST['title'];
-    $author = $_POST['author'];
-    $condition = $_POST['condition'];
-    $availability = $_POST['availability']; // hidden input
+$errors = [];
 
-    // Debug: check what is received
-    // var_dump($_POST); exit;
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $title = trim($_POST['title']);
+    $author = trim($_POST['author']);
+    $condition = trim($_POST['condition']);
+    $availability = $_POST['availability'];
 
-    $update_sql = "UPDATE books SET Title=?, Author=?, BookCondition=?, Availability=? WHERE Id=?";
-    $update_stmt = $conn->prepare($update_sql);
-    $update_stmt->bind_param("ssssi", $title, $author, $condition, $availability, $book_id);
+    if (empty($title) || empty($author) || empty($condition) || empty($availability)) {
+        $errors[] = "All fields are required.";
+    }
 
-    if ($update_stmt->execute()) {
-        header("Location: inventory.php");
-        exit();
-    } else {
-        $errors[] = "Error updating book: " . $conn->error;
+    if (empty($errors)) {
+        $update_sql = "UPDATE books 
+                       SET Title=?, Author=?, BookCondition=?, Availability=? 
+                       WHERE Id=? AND OwnerId=?";
+        $update_stmt = $conn->prepare($update_sql);
+        $update_stmt->bind_param("ssssii", $title, $author, $condition, $availability, $book_id, $user_id);
+
+        if ($update_stmt->execute()) {
+            header("Location: inventory.php");
+            exit();
+        } else {
+            $errors[] = "Error updating book: " . $conn->error;
+        }
     }
 }
 ?>
@@ -56,8 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="Assets/EditBook.css">
     <style>
-        
-        * {
+      * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -72,14 +80,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             padding: 40px 20px;
         }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: #ffffff;
-            border-radius: 8px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-        }
+  .container {
+    max-width: 700px;          /* limit width so it doesn’t stretch full screen */
+    margin: 40px auto;         /* center horizontally with auto margins */
+    padding: 30px;             /* inner spacing */
+    background: #fff;          /* white card background */
+    border-radius: 12px;       /* rounded corners */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);  /* subtle shadow */
+}
 
         .header {
             background: #ffffff;
@@ -88,7 +96,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border-bottom: 1px solid #e8e4df;
         }
 
-        .header h1 {
+        .container h2 {
             font-family: 'Playfair Display', serif;
             font-size: 2.5rem;
             font-weight: 600;
@@ -173,55 +181,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin-top: 15px;
         }
 
-.availability-option { 
-    padding: 24px 20px; 
-    border: 1px solid #d4cfc7; 
-    border-radius: 4px; 
-    text-align: center; 
-    cursor: pointer; 
-    transition: all 0.2s ease; 
-    background: #ffffff; 
-}
+        .availability-option {
+            padding: 24px 20px;
+            border: 1px solid #d4cfc7;
+            border-radius: 4px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #ffffff;
+        }
 
-/* Hover effect for all options */
-.availability-option:hover { 
-    border-color: #a69b8f; 
-    background: #fafaf8; 
-}
+        .availability-option:hover {
+            border-color: #a69b8f;
+            background: #fafaf8;
+        }
 
-/* Selected states with different colors for each availability */
-.availability-option.selected.Available { 
-    border-color: #28a745; 
-    background-color: #d4edda; 
-    color: #155724; 
-}
+        .availability-option.selected {
+            border-color: #2c2c2c;
+            background: #2c2c2c;
+            color: #ffffff;
+        }
 
-.availability-option.selected.Pending { 
-    border-color: #ffc107; 
-    background-color: #fff3cd; 
-    color: #856404; 
-}
+        .availability-icon {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            display: block;
+        }
 
-.availability-option.selected.Sold { 
-    border-color: #dc3545; 
-    background-color: #f8d7da; 
-    color: #721c24; 
-}
-
-/* Icon inside each option */
-.availability-icon { 
-    font-size: 1.2rem; 
-    margin-bottom: 8px; 
-    display: block; 
-}
-
-/* Label text inside each option */
-.availability-label { 
-    font-weight: 500; 
-    font-size: 0.9rem; 
-    letter-spacing: 0.2px; 
-}
-
+        .availability-label {
+            font-weight: 500;
+            font-size: 0.9rem;
+            letter-spacing: 0.2px;
+        }
 
         .btn-container {
             margin-top: 50px;
@@ -341,16 +332,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Edit Book</h1>
-            <p>Update your book listing information</p>
+<div class="container">
+    <h2 class="header">Edit Book</h2>
+
+    <?php if (!empty($errors)): ?>
+        <div class="errors">
+            <?php foreach ($errors as $error) echo "<p>$error</p>"; ?>
         </div>
-        
-        <div class="form-container">
-            <form method="POST" action="edit_book.php?id=<?php echo $book_id; ?>" id="editBookForm">
-                
-                <div class="section-title">Book Details</div>
+    <?php endif; ?>
+
+ <body>
+    <form method="POST" action="edit_book.php?id=<?php echo $book_id; ?>" id="editBookForm">
+    <div class="section-title">Book Details</div>
                 <div class="section-subtitle">Essential information about your book</div>
                 
                 <div class="form-row">
@@ -376,7 +369,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                placeholder="Enter author name">
                     </div>
                 </div>
-
                 <div class="divider"></div>
 
                 <div class="section-title">Condition & Status</div>
@@ -393,65 +385,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <option value="poor" <?php if ($book['BookCondition'] === 'poor') echo 'selected'; ?>>Poor</option>
                     </select>
                 </div>
-
-<div class="form-group availability-section">
-    <label>Availability Status</label>
-    <div class="availability-grid">
-        <?php
-        $statuses = ['Available' => '●', 'Pending' => '○', 'Sold' => '✓'];
-        foreach ($statuses as $status => $icon) {
-            $isSelected = ($book['Availability'] === $status) ? 'selected' : '';
-            echo '<div class="availability-option '.$status.' '.$isSelected.'" 
-                      onclick="selectAvailability(\''.$status.'\', this)">
-                      <span class="availability-icon">'.$icon.'</span>
-                      <div class="availability-label">'.$status.'</div>
-                  </div>';
-        }
-        ?>
-    </div>
-    <!-- Single hidden input -->
-    <input type="hidden" name="availability" id="availability" value="<?php echo htmlspecialchars($book['Availability']); ?>">
-</div>
-
-<script>
-function selectAvailability(status, element) {
-    // Remove 'selected' from all
-    document.querySelectorAll('.availability-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    // Add 'selected' to clicked
-    element.classList.add('selected');
-    // Update hidden input
-    document.getElementById('availability').value = status;
-}
-</script>
-                </div>
-                    <input type="hidden" name="availability" id="availability" value="<?php echo htmlspecialchars($book['Availability']); ?>">
-                </div>
-
-                <div class="divider"></div>
-
-                <div class="btn-container">
-                    <button type="button" class="btn btn-secondary">
-                        Cancel
-                    </button>
-                    <button type="submit" class="btn btn-primary" id="submitBtn" >
-                        Update Book
-                    </button>
-                </div>
-            </form>
+        <div class="form-group">
+            <label>Availability</label>
+            <div class="availability-grid">
+                <?php 
+                $statuses = ['Available' => '●', 'Pending' => '○', 'Sold' => '✓'];
+                foreach ($statuses as $status => $icon) {
+                    $isSelected = ($book['Availability'] === $status) ? 'selected' : '';
+                    echo '<div class="availability-option '.$isSelected.'" onclick="selectAvailability(\''.$status.'\', this)">
+                              <span>'.$icon.'</span><br>'.$status.'
+                          </div>';
+                }
+                ?>
+            </div>
+            <input type="hidden" name="availability" id="availability" value="<?php echo htmlspecialchars($book['Availability']); ?>">
         </div>
-    </div>
+<div class="btn-container">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="button" class="btn btn-secondary" onclick="window.location='inventory.php'">Cancel</button>
+   </div>
+    </form>
+</div>
 </body>
 <script>
 function selectAvailability(status, element) {
-    // Remove 'selected' from all options
-    document.querySelectorAll('.availability-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    // Add 'selected' to clicked option
+    document.querySelectorAll('.availability-option').forEach(opt => opt.classList.remove('selected'));
     element.classList.add('selected');
-    // Update hidden input value
     document.getElementById('availability').value = status;
 }
 </script>

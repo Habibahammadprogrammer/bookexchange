@@ -4,79 +4,69 @@ require_once 'includes/config.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
-    exit();
+    exit;
 }
 
 $user_id = $_SESSION['user_id'];
-$errors = [];
-$success = "";
 
-// Handle sending a message
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $request_id = intval($_POST['request_id'] ?? 0); // must link to a request
-    $message = trim($_POST['body'] ?? '');
-    $thread_id = intval($_POST['thread_id'] ?? 0);
+// Start a chat with a selected user
+$start_with = $_GET['start_with'] ?? 0;
+$selected_thread_id = 0;
 
-    if (!empty($message)) {
+if ($start_with) {
+    // Check if thread already exists
+    $check_thread = $conn->query("
+        SELECT Id
+        FROM chat_threads
+        WHERE (User1Id = $user_id AND User2Id = $start_with)
+           OR (User1Id = $start_with AND User2Id = $user_id)
+        LIMIT 1
+    ");
 
-        // Create thread if it doesn't exist
-        if ($thread_id <= 0) {
-            $stmt_thread = $conn->prepare("INSERT INTO threads (RequestId, CreatedAt) VALUES (?, NOW())");
-            $stmt_thread->bind_param("i", $request_id);
-            if ($stmt_thread->execute()) {
-                $thread_id = $conn->insert_id; // new thread ID
-            } else {
-                $errors[] = "Failed to create a new thread.";
-            }
-            $stmt_thread->close();
-        }
-
-        // Insert message
-        if ($thread_id > 0) {
-            $stmt_msg = $conn->prepare("INSERT INTO messages (ThreadId, SenderId, Body, CreatedAt) VALUES (?, ?, ?, NOW())");
-            $stmt_msg->bind_param("iis", $thread_id, $user_id, $message);
-            if ($stmt_msg->execute()) {
-                $success = "Message sent!";
-            } else {
-                $errors[] = "Failed to send message.";
-            }
-            $stmt_msg->close();
-        }
-
+    if ($check_thread->num_rows > 0) {
+        $thread = $check_thread->fetch_assoc();
+        $selected_thread_id = $thread['Id'];
     } else {
-        $errors[] = "Please enter a message.";
+        // Create new thread
+        $conn->query("
+            INSERT INTO chat_threads (User1Id, User2Id) VALUES ($user_id, $start_with)
+        ");
+        $selected_thread_id = $conn->insert_id;
     }
 }
 
+// Send a new message
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['body'])) {
+    $thread_id = intval($_POST['thread_id']);
+    $body = $conn->real_escape_string($_POST['body']);
 
-$threads = $conn->query("
-    SELECT t.Id, t.RequestId,
-           u.Id AS OtherUserId,
-           u.Name AS OtherUserName
-    FROM threads t
-    JOIN messages m ON t.Id = m.ThreadId
-    JOIN users u ON u.Id != $user_id AND u.Id = m.SenderId
-    GROUP BY t.Id
-    ORDER BY t.CreatedAt DESC
+    $conn->query("
+        INSERT INTO messages (ThreadId, SenderId, Body, CreatedAt)
+        VALUES ($thread_id, $user_id, '$body', NOW())
+    ");
+
+    $selected_thread_id = $thread_id;
+}
+
+// Fetch all users except logged-in user
+$users = $conn->query("
+    SELECT Id, Name
+    FROM users
+    WHERE Id != $user_id
+    ORDER BY Name ASC
 ");
 
-
-
-// Selected thread messages
-$selected_thread_id = intval($_GET['thread_id'] ?? 0);
+// Fetch messages for the selected thread
 $messages = [];
-
 if ($selected_thread_id) {
-    $stmt_msg = $conn->prepare("SELECT m.*, u.Name
-                                FROM messages m
-                                JOIN users u ON m.SenderId = u.Id
-                                WHERE ThreadId = ?
-                                ORDER BY CreatedAt ASC");
-    $stmt_msg->bind_param("i", $selected_thread_id);
-    $stmt_msg->execute();
-    $result_msg = $stmt_msg->get_result();
-    $messages = $result_msg->fetch_all(MYSQLI_ASSOC);
-    $stmt_msg->close();
+    $msg_query = $conn->query("
+        SELECT m.*, u.Name
+        FROM messages m
+        JOIN users u ON m.SenderId = u.Id
+        WHERE m.ThreadId = $selected_thread_id
+        ORDER BY m.CreatedAt ASC
+    ");
+    $messages = $msg_query->fetch_all(MYSQLI_ASSOC);
 }
 ?>
 <!DOCTYPE html>
@@ -126,21 +116,15 @@ ul li a:hover { text-decoration:underline; }
 </style>
 </head>
 <body>
-<h2>Your Messages</h2>
-
 <div class="container">
-
-    <!-- Threads sidebar -->
+    <!-- Users sidebar -->
     <div class="inbox">
-        <h3>Threads</h3>
+        <h3>Users</h3>
         <ul>
-        <?php while($thread = $threads->fetch_assoc()): ?>
+        <?php while ($user = $users->fetch_assoc()): ?>
             <li>
-                <a href="?thread_id=<?php echo $thread['Id']; ?>">
-                   <?php echo $thread['OtherUserName']; ?> 
-                    <?php if (!empty($thread['LastSender'])): ?>
-                        - Last: <?php echo htmlspecialchars($thread['LastSender']); ?>
-                    <?php endif; ?>
+                <a href="messages.php?start_with=<?= $user['Id']; ?>">
+                    <?= htmlspecialchars($user['Name']); ?>
                 </a>
             </li>
         <?php endwhile; ?>
@@ -155,9 +139,9 @@ ul li a:hover { text-decoration:underline; }
                 <?php if (!empty($messages)): ?>
                     <?php foreach ($messages as $msg): ?>
                         <p>
-                            <strong><?php echo htmlspecialchars($msg['Name']); ?>:</strong>
-                            <?php echo htmlspecialchars($msg['Body']); ?><br>
-                            <small><?php echo $msg['CreatedAt']; ?></small>
+                            <strong><?= htmlspecialchars($msg['Name']); ?>:</strong>
+                            <?= htmlspecialchars($msg['Body']); ?><br>
+                            <small><?= $msg['CreatedAt']; ?></small>
                         </p>
                     <?php endforeach; ?>
                 <?php else: ?>
@@ -166,16 +150,16 @@ ul li a:hover { text-decoration:underline; }
             </div>
 
             <form method="POST" action="">
-                <input type="hidden" name="thread_id" value="<?php echo $selected_thread_id; ?>">
-                <input type="hidden" name="request_id" value="<?php echo $selected_thread_id; ?>"> 
+                <input type="hidden" name="thread_id" value="<?= $selected_thread_id; ?>">
                 <textarea name="body" placeholder="Type your message..." required></textarea><br>
                 <button type="submit">Send</button>
             </form>
         <?php else: ?>
-            <p>Select a thread to start chatting.</p>
+            <p>Select a user to start chatting.</p>
         <?php endif; ?>
     </div>
 </div>
+
 <div class="bottom-btn">
     <a href="home.php" class="btn-back">Back to Home</a>
 </div>

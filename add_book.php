@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $owner_id = $_SESSION['user_id'];
     $description=trim($_POST['description']);
     if (!empty($title) && !empty($author) && !empty($condition) && !empty($availability) && $genre_id > 0) {
-        $stmt = $conn->prepare("INSERT INTO books (Title, Author, BookCondition, Availability, GenreId,OwnerId,Description,ISBN) VALUES (?, ?, ?, ?, ?, ?,?,?,?)");
+        $stmt = $conn->prepare("INSERT INTO books (Title, Author, BookCondition, Availability, GenreId,OwnerId,Description,ISBN) VALUES (?, ?, ?, ?, ?, ?,?,?)");
         $stmt->bind_param("ssssiiss", $title, $author, $condition, $availability, $genre_id, $owner_id, $description, $isbn);
 
         if ($stmt->execute()) {
