@@ -10,7 +10,7 @@ $user_id = $_SESSION['user_id'];
 $success = '';
 $error = '';
 
-// Make sure a book_id is provided
+
 if (!isset($_GET['book_id'])) {
     die("No book specified.");
 }

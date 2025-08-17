@@ -296,7 +296,7 @@ tbody tr:hover {
                     <td>
                         <a href="edit_book.php?id=<?php echo $row['Id']; ?>" class="btn">Edit</a>
                         <a href="delete_book.php?id=<?php echo $row['Id']; ?>" onclick="return confirm('Are you sure you want to delete this book?');" class="btn delete">Delete</a>
-                        <a href="request_exchanges.php=?id<?php echo $row['Id'];?>" class="btn">Request Exchange</a>
+                        <a href="request_exchange.php?book_id=<?php echo $row['Id']; ?>" class="btn">Request Exchange</a>
                     </td>
                 </tr>
             <?php endwhile; ?>

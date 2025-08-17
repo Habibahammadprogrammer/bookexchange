@@ -1,74 +1,85 @@
-<?php
-session_start();
-require_once 'includes/config.php';
+<?php 
+session_start(); 
+require_once 'includes/config.php'; 
 
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
-}
+if (!isset($_SESSION['user_id'])) { 
+    header("Location: login.php"); 
+    exit; 
+} 
 
-$user_id = $_SESSION['user_id'];
+$user_id = $_SESSION['user_id']; 
 
-// Start a chat with a selected user
-$start_with = $_GET['start_with'] ?? 0;
-$selected_thread_id = 0;
+// --- Fetch Notifications --- 
+$notif_sql = "SELECT * FROM notifications WHERE UserId = ? ORDER BY CreatedAt DESC LIMIT 5"; 
+$notif_stmt = $conn->prepare($notif_sql); 
+$notif_stmt->bind_param("i", $user_id); 
+$notif_stmt->execute(); 
+$notif_result = $notif_stmt->get_result();  
 
-if ($start_with) {
-    // Check if thread already exists
-    $check_thread = $conn->query("
-        SELECT Id
-        FROM chat_threads
-        WHERE (User1Id = $user_id AND User2Id = $start_with)
-           OR (User1Id = $start_with AND User2Id = $user_id)
-        LIMIT 1
-    ");
 
-    if ($check_thread->num_rows > 0) {
-        $thread = $check_thread->fetch_assoc();
-        $selected_thread_id = $thread['Id'];
-    } else {
-        // Create new thread
-        $conn->query("
-            INSERT INTO chat_threads (User1Id, User2Id) VALUES ($user_id, $start_with)
-        ");
-        $selected_thread_id = $conn->insert_id;
-    }
-}
+// --- Start a chat with a selected user --- 
+$start_with = $_GET['start_with'] ?? 0; 
+$selected_thread_id = 0; 
 
-// Send a new message
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['body'])) {
-    $thread_id = intval($_POST['thread_id']);
-    $body = $conn->real_escape_string($_POST['body']);
+if ($start_with) { 
+    // Check if thread already exists 
+    $check_thread = $conn->query(" 
+        SELECT Id 
+        FROM chat_threads 
+        WHERE (User1Id = $user_id AND User2Id = $start_with) 
+           OR (User1Id = $start_with AND User2Id = $user_id) 
+        LIMIT 1 
+    "); 
 
-    $conn->query("
-        INSERT INTO messages (ThreadId, SenderId, Body, CreatedAt)
-        VALUES ($thread_id, $user_id, '$body', NOW())
-    ");
+    if ($check_thread->num_rows > 0) { 
+        $thread = $check_thread->fetch_assoc(); 
+        $selected_thread_id = $thread['Id']; 
+    } else { 
+        // Create new thread 
+        $conn->query(" 
+            INSERT INTO chat_threads (User1Id, User2Id) VALUES ($user_id, $start_with) 
+        "); 
+        $selected_thread_id = $conn->insert_id; 
+    } 
+} 
 
-    $selected_thread_id = $thread_id;
-}
+// --- Send a new message --- 
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['body'])) { 
+    $thread_id = intval($_POST['thread_id']); 
+    $body = $conn->real_escape_string($_POST['body']); 
 
-// Fetch all users except logged-in user
-$users = $conn->query("
-    SELECT Id, Name
-    FROM users
-    WHERE Id != $user_id
-    ORDER BY Name ASC
-");
+    // Insert the new message 
+    $conn->query(" 
+        INSERT INTO messages (ThreadId, SenderId, Body, CreatedAt) 
+        VALUES ($thread_id, $user_id, '$body', NOW()) 
+    "); 
 
-// Fetch messages for the selected thread
-$messages = [];
-if ($selected_thread_id) {
-    $msg_query = $conn->query("
-        SELECT m.*, u.Name
-        FROM messages m
-        JOIN users u ON m.SenderId = u.Id
-        WHERE m.ThreadId = $selected_thread_id
-        ORDER BY m.CreatedAt ASC
-    ");
-    $messages = $msg_query->fetch_all(MYSQLI_ASSOC);
-}
+    $selected_thread_id = $thread_id; 
+
+} 
+
+// --- Fetch all users except logged-in user --- 
+$users = $conn->query(" 
+    SELECT Id, Name 
+    FROM users 
+    WHERE Id != $user_id 
+    ORDER BY Name ASC 
+"); 
+
+// --- Fetch messages for the selected thread --- 
+$messages = []; 
+if ($selected_thread_id) { 
+    $msg_query = $conn->query(" 
+        SELECT m.*, u.Name 
+        FROM messages m 
+        JOIN users u ON m.SenderId = u.Id 
+        WHERE m.ThreadId = $selected_thread_id 
+        ORDER BY m.CreatedAt ASC 
+    "); 
+    $messages = $msg_query->fetch_all(MYSQLI_ASSOC); 
+} 
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -112,6 +123,7 @@ ul li a:hover { text-decoration:underline; }
 .btn-back:hover {
     background-color: #d17a5f;
     transform: scale(1.05);
+
 }
 </style>
 </head>

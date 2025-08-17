@@ -14,30 +14,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $exchange_id = intval($_POST['exchange_id'] ?? 0);
 
-    if ($exchange_id && $action === 'Rate') {
-        $rating = intval($_POST['rating'] ?? 0);
+    if ($exchange_id && $action) {
+        if ($action === 'Accept') {
+            $stmt = $conn->prepare("UPDATE exchangerequests SET Status = 'Accepted' WHERE Id = ? AND OwnerId = ?");
+            $stmt->bind_param("ii", $exchange_id, $user_id);
+            $stmt->execute();
+            $stmt->close();
 
-        if ($rating >= 1 && $rating <= 5) {
-    $stmt = $conn->prepare("
-        UPDATE exchangerequests 
-        SET Rating=? 
-        WHERE Id=? 
-        AND (RequesterId=? OR OwnerId=?)
-    ");
-    $stmt->bind_param("iiii", $rating, $exchange_id, $user_id, $user_id);
+        } elseif ($action === 'Reject') {
+            $stmt = $conn->prepare("UPDATE exchangerequests SET Status = 'Rejected' WHERE Id = ? AND OwnerId = ?");
+            $stmt->bind_param("ii", $exchange_id, $user_id);
+            $stmt->execute();
+            $stmt->close();
 
-    if (!$stmt->execute()) {
-        die("Failed to save rating: " . $stmt->error);
-    }
-}
-            if (!$stmt->execute()) {
-                die("Failed to save rating: " . $stmt->error);
+        } elseif ($action === 'Rate') {
+            $rating = intval($_POST['rating'] ?? 0);
+            if ($rating >= 1 && $rating <= 5) {
+                $stmt = $conn->prepare("UPDATE exchangerequests SET Rating = ? WHERE Id = ? AND RequesterId = ?");
+                $stmt->bind_param("iii", $rating, $exchange_id, $user_id);
+                $stmt->execute();
+                $stmt->close();
             }
         }
-
-        header("Location: exchanges.php");
-        exit();
     }
+
+
+    header("Location: exchanges.php");
+    exit();
+}
+
 
 
 
@@ -478,29 +483,36 @@ $exchanges = $result->fetch_all(MYSQLI_ASSOC);
                 </div>
 
                 <div class="card-body">
-<?php if ($row['Status'] === 'Accepted'): ?>
-    <?php if (empty($row['Rating'])): ?>
-        <form method="POST" action="exchanges.php">
+                    <?php if ($row['Status'] === 'Pending' && $row['OwnerId'] == $user_id): ?>
+        <form method="POST" action="exchanges.php" class="action-form">
             <input type="hidden" name="exchange_id" value="<?php echo $row['Id']; ?>">
-            <select name="rating" class="rating-select" required>
-                <option value="">Rate Experience</option>
-                <option value="1">1 ⭐</option>
-                <option value="2">2 ⭐</option>
-                <option value="3">3 ⭐</option>
-                <option value="4">4 ⭐</option>
-                <option value="5">5 ⭐</option>
-            </select>
-            <button type="submit" name="action" value="Rate" class="btn btn-primary">
-                Submit
-            </button>
+            <button type="submit" name="action" value="Accept" class="btn btn-success">Accept</button>
+            <button type="submit" name="action" value="Reject" class="btn btn-danger">Reject</button>
         </form>
-    <?php else: ?>
-        <div class="rating-display">
-            Rated: <?php echo htmlspecialchars($row['Rating']); ?> ⭐
-        </div>
-    <?php endif; ?>
-<?php endif; ?>
-
+<?php elseif ($row['Status'] === 'Accepted'): ?> 
+    <?php if ($row['RequesterId'] == $user_id): ?> <!-- Only requester can rate -->
+        <?php if (empty($row['Rating'])): ?> 
+            <form method="POST" action="exchanges.php"> 
+                <input type="hidden" name="exchange_id" value="<?php echo $row['Id']; ?>"> 
+                <select name="rating" class="rating-select" required> 
+                    <option value="">Rate Experience</option> 
+                    <option value="1">1 ⭐</option> 
+                    <option value="2">2 ⭐</option> 
+                    <option value="3">3 ⭐</option> 
+                    <option value="4">4 ⭐</option> 
+                    <option value="5">5 ⭐</option> 
+                </select> 
+                <button type="submit" name="action" value="Rate" class="btn btn-primary"> 
+                    Submit 
+                </button> 
+            </form> 
+        <?php else: ?> 
+            <div class="rating-display"> 
+                Rated: <?php echo htmlspecialchars($row['Rating']); ?> ⭐ 
+            </div> 
+        <?php endif; ?> 
+    <?php endif; ?> 
+<?php endif; ?> 
             </div>
         <?php endforeach; ?>
     <?php else: ?>

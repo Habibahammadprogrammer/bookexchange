@@ -20,6 +20,17 @@ if ($row = $result->fetch_assoc()) {
     }
 }
 $stmt->close();
+$sql = "SELECT COUNT(*) AS unread_count 
+        FROM exchangerequests 
+        WHERE (OwnerId = ? OR RequesterId = ?) 
+          AND Status IN ('pending')"; 
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("ii", $user_id, $user_id);
+$stmt->execute();
+$result = $stmt->get_result();
+$row = $result->fetch_assoc();
+$unreadCount = $row['unread_count'] ?? 0;
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -57,110 +68,188 @@ $stmt->close();
             padding: 0 20px;
         }
 
-        /* Header */
-        header {
-            background: var(--cream);
-            box-shadow: 0 2px 20px rgba(0,0,0,0.08);
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
+        
+.site-header {
+    background: var(--cream);
+    box-shadow: 0 2px 20px rgba(0,0,0,0.08);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    padding: 0.5rem 0;
+}
 
-        .header-content {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 1rem 0;
-        }
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
 
-        .logo {
-            font-family: 'Playfair Display', serif;
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--charcoal);
-            text-decoration: none;
-            gap:100px;
-        }
+.header-grid {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 2rem;
+}
 
-        .nav-menu {
+/* Logo Section */
+.logo-section .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--charcoal);
+    text-decoration: none;
+    transition: var(--transition);
+    white-space: nowrap;
+}
+
+.logo-section .logo:hover {
+    color: var(--orange);
+}
+
+/* Main Navigation */
+.main-nav {
+    flex-grow: 1;
+    margin: 0 2rem;
+}
+
+.nav-list {
     display: flex;
     list-style: none;
-    gap:1.8rem;
-    align-items: center;
     margin: 0;
     padding: 0;
-    justify-content: space-between;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
 }
 
-.nav-menu li {
-    display: inline-block;
-}
-
-.nav-menu a, .search-cart a  {
+.nav-link {
     text-decoration: none;
-    color: var(--text-color, black);
+    color: var(--text-color);
     font-weight: 500;
-    position: relative; 
-    transition: color 0.3s ease; 
+    padding: 0.5rem 0;
+    position: relative;
+    transition: var(--transition);
+    white-space: nowrap;
 }
 
-.nav-menu a::after , .search-cart a::after{
+.nav-link::after {
     content: '';
     position: absolute;
-    bottom: -5px;
+    bottom: 0;
     left: 0;
     width: 0;
     height: 2px;
-    background-color: var(--orange, #f97316);
-    transition: width 0.3s ease; 
+    background-color: var(--orange);
+    transition: var(--transition);
 }
 
-.nav-menu a:hover ,.search-cart a:hover{
-    color: var(--orange, #f97316);
+.nav-link:hover {
+    color: var(--orange);
 }
 
-.nav-menu a:hover::after , .search-cart a:hover::after {
-    width: 100%; 
+.nav-link:hover::after {
+    width: 100%;
 }
 
-
-.login-btn, .logout-btn, .inventory-btn, .add-book-btn, .msg-btn, .exchange-btn {
-    background: var(--orange, #f97316);
-    color: white !important;
+/* Navigation Buttons */
+.nav-btn {
     padding: 0.5rem 1rem;
     border-radius: 10px;
     font-weight: 500;
-    transition: all 0.3s ease;
+    transition: var(--transition);
+    text-decoration: none;
     display: inline-block;
-    white-space:nowrap;
-    min-width:max-content;
+    white-space: nowrap;
+    min-width: max-content;
 }
 
-.login-btn:hover, .logout-btn:hover, .inventory-btn:hover, .add-book-btn:hover ,.msg-btn:hover,.exchange-btn:hover{
-    background: #ea580c; 
+.login-btn, 
+.logout-btn, 
+.inventory-btn, 
+.add-book-btn, 
+.msg-btn, 
+.exchange-btn {
+    background: var(--orange);
+    color: var(--white) !important;
 }
 
-        .search-cart {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
+.nav-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
 
-        .icon-btn {
-            background: none;
-            border: none;
-            color: var(--charcoal);
-            cursor: pointer;
-            font-size: 1.2rem;
-            padding: 0.5rem;
-            transition: color 0.3s ease;
-            margin-left:50px;
-        }
+.login-btn:hover, 
+.logout-btn:hover, 
+.inventory-btn:hover, 
+.add-book-btn:hover,
+.msg-btn:hover,
+.exchange-btn:hover {
+    background: var(--orange-dark);
+}
 
-        .icon-btn:hover {
-            color: var(--orange);
-        }
+/* User Section */
+.user-section {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
 
+.profile-link, 
+.notification-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    text-decoration: none;
+    color: var(--text-color);
+    font-weight: 500;
+    transition: var(--transition);
+}
+
+.profile-icon, 
+.notification-icon {
+    font-size: 1.2rem;
+}
+
+.notification-count {
+    background: var(--orange);
+    color: white;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+}
+
+.profile-link:hover, 
+.notification-badge:hover {
+    color: var(--orange);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .header-grid {
+        flex-direction: column;
+        gap: 1rem;
+        padding: 1rem 0;
+    }
+    
+    .main-nav {
+        margin: 1rem 0;
+        width: 100%;
+    }
+    
+    .nav-list {
+        justify-content: center;
+        gap: 1rem;
+    }
+    
+    .user-section {
+        margin-top: 0.5rem;
+    }
+}
         /* Hero Section */
         .hero {
             background: linear-gradient(135deg, var(--cream) 0%, #F0ECE8 100%);
@@ -1013,41 +1102,52 @@ $stmt->close();
     </style>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
+    <header class="site-header">
+    <div class="container">
+        <div class="header-grid">
+            <!-- Logo Section -->
+            <div class="logo-section">
                 <a href="#" class="logo">Chapter & Verse</a>
-                </div>
-<nav> 
-    <ul class="nav-menu"> 
-        <li><a href="#featured">Popular Books</a></li> 
-        <li><a href="#genres">Book Types</a></li> 
-        <li><a href="#staff-picks">Our Picks</a></li> 
-        <li><a href="#new-arrivals">New Books</a></li> 
-        <li><a href="#about">About Us</a></li> 
-        <li><a href="inventory.php" class="inventory-btn">Inventory</a></li> 
-        <li><a href="add_book.php" class="add-book-btn">Add Book</a></li> 
-        <li><a href="messages.php" class="msg-btn">Messages</a></li>
-        <li><a href="exchanges.php" class="exchange-btn">Exchanges</a></li>
-        <?php if(isset($_SESSION['user_id'])): ?>
-            <!-- Show when logged in -->
-            <li><a href="logout.php" class="logout-btn">Sign Out</a></li> 
-        <?php else: ?>
-            <!-- Show when not logged in -->
-            <li><a href="register.php" class="login-btn">Sign In</a></li> 
-        <?php endif; ?>
-    </ul> 
- 
-</nav>
-                <div class="search-cart">
-                    <button class="icon-btn">👤 <a href="profile.php">Profile</a></button>
-                    <?php if ($is_admin): ?>
-                </div>
+            </div>
+            
+            <!-- Main Navigation -->
+            <nav class="main-nav"> 
+                <ul class="nav-list"> 
+                    <li><a href="#featured" class="nav-link">Popular Books</a></li> 
+                    <li><a href="#genres" class="nav-link">Book Types</a></li> 
+                    <li><a href="#staff-picks" class="nav-link">Our Picks</a></li> 
+                    <li><a href="#new-arrivals" class="nav-link">New Books</a></li> 
+                    <li><a href="#about" class="nav-link">About Us</a></li> 
+                    
+                    <!-- Action Buttons -->
+                    <li><a href="inventory.php" class="nav-btn inventory-btn">Inventory</a></li> 
+                    <li><a href="add_book.php" class="nav-btn add-book-btn">Add Book</a></li> 
+                    <li><a href="messages.php" class="nav-btn msg-btn">Messages</a></li>
+                    <li><a href="exchanges.php" class="nav-btn exchange-btn">Exchanges</a></li>
+                    
+                    <!-- Auth Buttons -->
+                    <?php if(isset($_SESSION['user_id'])): ?>
+                        <li><a href="logout.php" class="nav-btn logout-btn">Sign Out</a></li> 
+                    <?php else: ?>
+                        <li><a href="register.php" class="nav-btn login-btn">Sign In</a></li> 
+                    <?php endif; ?>
+                </ul> 
+            </nav>
+            
+            <!-- User Section -->
+            <div class="user-section">
+                <a href="profile.php" class="profile-link">
+                    <span class="profile-icon">👤</span>
+                    <span class="profile-text">Profile</span>
+                </a>
+                <a href="notifications.php" class="notification-badge">
+                    <span class="notification-icon">🔔</span>
+                    <span class="notification-count">(<?php echo $unreadCount; ?>)</span>
+                </a>
             </div>
         </div>
-    </header>
-
+    </div>
+</header>
     <main>
         <section class="hero">
             <div class="container">
@@ -1282,7 +1382,6 @@ $stmt->close();
 <div class="admin-btn-container">
         <a href="admin.php" class="admin-btn">Go to Admin Panel</a>
     </div>
-<?php endif; ?>
     <footer>
         <div class="container">
             <div class="footer-content">

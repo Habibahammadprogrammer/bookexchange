@@ -16,7 +16,7 @@ $result = $query->get_result();
 $user = $result->fetch_assoc();
 
 if (!$user || $user['Role'] !== 'admin') {
-    header("Location: index.php");
+    header("Location: home.php");
     exit();
 }
 if (!$user || strtolower($user['Role']) !== 'admin') {
