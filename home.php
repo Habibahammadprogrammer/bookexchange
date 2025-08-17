@@ -5,6 +5,21 @@ if(!isset($_SESSION["user_id"])){
     header("Location:login.php");
     exit();
 }
+$user_id = $_SESSION['user_id'];
+
+$is_admin = false;
+$sql = "SELECT Role FROM users WHERE Id = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("i", $user_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($row = $result->fetch_assoc()) {
+    if (strtolower($row['Role']) === 'admin') {
+        $is_admin = true;
+    }
+}
+$stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -975,6 +990,26 @@ if(!isset($_SESSION["user_id"])){
             opacity: 1;
             transform: translateY(0);
         }
+        .admin-btn {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background-color: #ff9800;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: bold;
+    box-shadow: 0px 4px 8px rgba(0,0,0,0.2);
+    transition: 0.3s ease;
+    z-index: 1000; /* stays above other elements */
+}
+
+.admin-btn:hover {
+    background-color: #e68900;
+    transform: scale(1.05);
+}
+
     </style>
 </head>
 <body>
@@ -1003,9 +1038,11 @@ if(!isset($_SESSION["user_id"])){
             <li><a href="register.php" class="login-btn">Sign In</a></li> 
         <?php endif; ?>
     </ul> 
+ 
 </nav>
                 <div class="search-cart">
                     <button class="icon-btn">👤 <a href="profile.php">Profile</a></button>
+                    <?php if ($is_admin): ?>
                 </div>
             </div>
         </div>
@@ -1242,7 +1279,10 @@ if(!isset($_SESSION["user_id"])){
             </div>
         </section>
     </main>
-
+<div class="admin-btn-container">
+        <a href="admin.php" class="admin-btn">Go to Admin Panel</a>
+    </div>
+<?php endif; ?>
     <footer>
         <div class="container">
             <div class="footer-content">

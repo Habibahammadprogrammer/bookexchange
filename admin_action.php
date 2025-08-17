@@ -19,6 +19,9 @@ if (!$user || $user['Role'] !== 'admin') {
     header("Location: index.php");
     exit();
 }
+if (!$user || strtolower($user['Role']) !== 'admin') {
+    die("Access denied. Admins only.");
+}
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
